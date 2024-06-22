@@ -1,0 +1,23 @@
+{
+  "dart.flutterSdkPath": ".fvm/versions/3.22.0",
+  "search.exclude": {
+    "**/.fvm": true
+  },
+  "files.watcherExclude": {
+    "**/.fvm": true
+  },
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.organizeImports": "explicit"
+  },
+  "dart.lineLength": 120,
+  "build-runner.flutterPath": ".fvm/flutter_sdk/bin/flutter",
+  "dart.previewFlutterUiGuides": true,
+  "dart.previewFlutterUiGuidesCustomTracking": true,
+  "dart.closingLabels": true,
+  "[dart]": {
+    "editor.codeActionsOnSave": {
+      "quickfix.insertSemicolon": "explicit"
+    }
+  }
+}

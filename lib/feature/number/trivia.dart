@@ -1,0 +1,1 @@
+typedef Trivia = (int, String);
