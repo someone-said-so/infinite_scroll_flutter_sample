@@ -4,11 +4,13 @@ import 'package:dio/dio.dart';
 import 'package:infinite_scroll_flutter_sample/feature/number/trivia_repository.dart';
 
 class TriviaRepositoryImpl extends TriviaRepository {
+  final Dio dio;
+
+  TriviaRepositoryImpl({required this.dio});
+
   @override
   Future<String> fetchTrivia(int number) async {
     try {
-      Dio dio = Dio();
-
       Response response = await dio.get('http://numbersapi.com/$number');
 
       if (response.statusCode == 200) {
@@ -24,7 +26,6 @@ class TriviaRepositoryImpl extends TriviaRepository {
   @override
   Future<Map<String, String>> fetchTrivias(List<int> numbers) async {
     try {
-      Dio dio = Dio();
       final numbersString = numbers.join(',');
       Response response = await dio.get<String>(
         'http://numbersapi.com/$numbersString',

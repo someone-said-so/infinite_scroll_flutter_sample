@@ -14,42 +14,63 @@ class MyHomePage extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final trivia = ref.watch(triviaProvider);
     final provider = ref.read(triviaProvider.notifier);
+    final loading = ref.watch(triviaLoadingProvider);
 
     final itemScrollController = useMemoized(() => ItemScrollController());
     final itemPositionsListener = useMemoized(() => ItemPositionsListener.create());
-    // final scrollOffsetController = useMemoized(() => ScrollOffsetController());
-    // final scrollOffsetListener = useMemoized(() => ScrollOffsetListener.create());
+    final scrollOffsetController = useMemoized(() => ScrollOffsetController());
+    final scrollOffsetListener = useMemoized(() => ScrollOffsetListener.create());
 
+    final initialized = useState(false);
     final topIndex = useState(0);
     final bottomIndex = useState(0);
 
-    final listener = useCallback(() {
-      final positions = itemPositionsListener.itemPositions.value;
-      if (positions.isNotEmpty) {
-        topIndex.value = min(positions.first.index, positions.last.index);
-        bottomIndex.value = max(positions.first.index, positions.last.index);
+    useEffect(() {
+      listener() {
+        final positions = itemPositionsListener.itemPositions.value;
+        if (positions.isNotEmpty && trivia.isNotEmpty) {
+          topIndex.value = min(positions.first.index, positions.last.index);
+          bottomIndex.value = max(positions.first.index, positions.last.index);
 
-        // final bottom = positions.last.index > positions.first.index ? positions.last : positions.first;
-        // final leading = max(bottom.itemLeadingEdge, 0.0);
-        // final trailing = min(bottom.itemTrailingEdge, 1.0);
-        // final percent = ((trailing - leading) * 100).toInt();
-        // print("bottom itemは画面表示領域の${percent}%を占有しています。");
+          print("topIndex: ${topIndex.value}, bottomIndex: ${bottomIndex.value}");
+
+          // final bottom = positions.last.index > positions.first.index ? positions.last : positions.first;
+          // final leading = max(bottom.itemLeadingEdge, 0.0);
+          // final trailing = min(bottom.itemTrailingEdge, 1.0);
+          // final percent = ((trailing - leading) * 100).toInt();
+          // print("bottom itemは画面表示領域の${percent}%を占有しています。");
+
+          final shouldSmallerFetch = (topIndex.value - trivia.first.$1) <= 3 && initialized.value;
+          if (shouldSmallerFetch) {
+            ref.read(triviaProvider.notifier).fetchSmaller(10);
+          }
+
+          final shouldBiggerFetch = (trivia.last.$1 - bottomIndex.value) <= 3 && initialized.value;
+          if (shouldBiggerFetch) {
+            ref.read(triviaProvider.notifier).fetchBigger(10);
+          }
+        }
       }
-    });
+
+      itemPositionsListener.itemPositions.addListener(listener);
+      return () => itemPositionsListener.itemPositions.removeListener(listener);
+    }, [trivia, initialized]);
 
     useEffect(() {
       // 40..59の配列を読み込む
-      provider.fetchTrivias(List.generate(20, (index) => index + 40)).then<void>((_) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        await provider.fetchTrivias(List.generate(20, (index) => index + 40));
         WidgetsBinding.instance.addPostFrameCallback((_) async {
-          // 40から数えて10番目の要素つまりは#49にスクロール
+          // 40から数えて10 + 1番目の要素つまりは#50にスクロール
           // itemScrollController.scrollTo(
           //     index: 10, alignment: 1.0, duration: const Duration(seconds: 1), curve: Curves.easeInOutCubic);
-          itemScrollController.jumpTo(index: 10);
+          itemScrollController.jumpTo(index: 50 + 1, alignment: 1.0);
+          WidgetsBinding.instance.addPostFrameCallback((_) async {
+            initialized.value = true;
+          });
         });
       });
-      itemPositionsListener.itemPositions.addListener(listener);
-
-      return () => itemPositionsListener.itemPositions.removeListener(listener);
+      return null;
     }, []);
 
     return Scaffold(
@@ -61,32 +82,41 @@ class MyHomePage extends HookConsumerWidget {
         children: [
           Padding(
             padding: const EdgeInsets.all(8.0),
-            child: Column(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                if (trivia.isNotEmpty) Text("List: [${trivia.first.$1}..${trivia.last.$1}]"),
-                if (trivia.isNotEmpty) Text("Scroll Top Index: ${topIndex.value} = ${trivia[topIndex.value].$1}"),
-                if (trivia.isNotEmpty)
-                  Text("Scroll Bottom Index: ${bottomIndex.value} = ${trivia[bottomIndex.value].$1}"),
+                if (loading) const CircularProgressIndicator(),
+                Column(
+                  children: [
+                    if (trivia.isNotEmpty) Text("List: [${trivia.first.$1}..${trivia.last.$1}]"),
+                    if (trivia.isNotEmpty) Text("Scroll Top Index: ${topIndex.value}"),
+                    if (trivia.isNotEmpty) Text("Scroll Bottom Index: ${bottomIndex.value}"),
+                  ],
+                ),
               ],
             ),
           ),
           Expanded(
-            child: ScrollablePositionedList.separated(
-              itemCount: trivia.length,
+            child: ScrollablePositionedList.builder(
+              itemCount: trivia.isEmpty ? 0 : 100,
               itemBuilder: (context, index) {
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 40.0, horizontal: 16.0),
-                  child: ListTile(
-                    leading: Text("${trivia[index].$1}", style: const TextStyle(fontSize: 14.0)),
-                    title: Text(trivia[index].$2),
-                  ),
-                );
+                final (int, String)? foundTrivia = trivia.where((element) => element.$1 == index).firstOrNull;
+                return switch (foundTrivia) {
+                  null => const SizedBox(height: 0),
+                  _ => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 40.0, horizontal: 16.0),
+                      child: ListTile(
+                        leading: Text("${foundTrivia.$1}", style: const TextStyle(fontSize: 14.0)),
+                        title: Text(foundTrivia.$2),
+                      ),
+                    )
+                };
               },
               itemScrollController: itemScrollController,
               itemPositionsListener: itemPositionsListener,
-              // scrollOffsetController: scrollOffsetController,
-              // scrollOffsetListener: scrollOffsetListener,
-              separatorBuilder: (BuildContext context, int index) => const Divider(),
+              scrollOffsetController: scrollOffsetController,
+              scrollOffsetListener: scrollOffsetListener,
+              physics: const RangeMaintainingScrollPhysics(),
             ),
           ),
         ],
