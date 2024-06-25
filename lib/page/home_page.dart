@@ -3,7 +3,10 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:infinite_scroll_flutter_sample/feature/number/trivia.dart';
 import 'package:infinite_scroll_flutter_sample/feature/number/trivia_notifier.dart';
+import 'package:infinite_scroll_flutter_sample/widget/scroll_control_header.dart';
+import 'package:infinite_scroll_flutter_sample/widget/trivia_list_item.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
 class MyHomePage extends HookConsumerWidget {
@@ -13,7 +16,7 @@ class MyHomePage extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final trivia = ref.watch(triviaProvider);
-    final provider = ref.read(triviaProvider.notifier);
+    final triviaNotifier = ref.read(triviaProvider.notifier);
     final loading = ref.watch(triviaLoadingProvider);
 
     final itemScrollController = useMemoized(() => ItemScrollController());
@@ -34,21 +37,17 @@ class MyHomePage extends HookConsumerWidget {
 
           print("topIndex: ${topIndex.value}, bottomIndex: ${bottomIndex.value}");
 
-          // final bottom = positions.last.index > positions.first.index ? positions.last : positions.first;
-          // final leading = max(bottom.itemLeadingEdge, 0.0);
-          // final trailing = min(bottom.itemTrailingEdge, 1.0);
-          // final percent = ((trailing - leading) * 100).toInt();
-          // print("bottom itemは画面表示領域の${percent}%を占有しています。");
+          final bottom = positions.last.index > positions.first.index ? positions.last : positions.first;
+          final leading = max(bottom.itemLeadingEdge, 0.0);
+          final trailing = min(bottom.itemTrailingEdge, 1.0);
+          final percent = ((trailing - leading) * 100).toInt();
+          print("bottom itemは画面表示領域の$percent%を占有しています。");
 
           final shouldSmallerFetch = (topIndex.value - trivia.first.$1) <= 3 && initialized.value;
-          if (shouldSmallerFetch) {
-            ref.read(triviaProvider.notifier).fetchSmaller(10);
-          }
+          if (shouldSmallerFetch) triviaNotifier.fetchSmaller(10);
 
           final shouldBiggerFetch = (trivia.last.$1 - bottomIndex.value) <= 3 && initialized.value;
-          if (shouldBiggerFetch) {
-            ref.read(triviaProvider.notifier).fetchBigger(10);
-          }
+          if (shouldBiggerFetch) triviaNotifier.fetchBigger(10);
         }
       }
 
@@ -59,7 +58,7 @@ class MyHomePage extends HookConsumerWidget {
     useEffect(() {
       // 40..59の配列を読み込む
       WidgetsBinding.instance.addPostFrameCallback((_) async {
-        await provider.fetchTrivias(List.generate(20, (index) => index + 40));
+        await triviaNotifier.fetchTrivias(List.generate(20, (index) => index + 40));
         WidgetsBinding.instance.addPostFrameCallback((_) async {
           // 40から数えて10 + 1番目の要素つまりは#50にスクロール
           // itemScrollController.scrollTo(
@@ -86,13 +85,12 @@ class MyHomePage extends HookConsumerWidget {
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 if (loading) const CircularProgressIndicator(),
-                Column(
-                  children: [
-                    if (trivia.isNotEmpty) Text("List: [${trivia.first.$1}..${trivia.last.$1}]"),
-                    if (trivia.isNotEmpty) Text("Scroll Top Index: ${topIndex.value}"),
-                    if (trivia.isNotEmpty) Text("Scroll Bottom Index: ${bottomIndex.value}"),
-                  ],
-                ),
+                if (trivia.isNotEmpty)
+                  ScrollControlHeader(
+                    firstIndex: trivia.first.$1,
+                    lastIndex: trivia.last.$1,
+                    scrollIndex: (topIndex: topIndex.value, bottomIndex: bottomIndex.value),
+                  ),
               ],
             ),
           ),
@@ -100,31 +98,20 @@ class MyHomePage extends HookConsumerWidget {
             child: ScrollablePositionedList.builder(
               itemCount: trivia.isEmpty ? 0 : 100,
               itemBuilder: (context, index) {
-                final (int, String)? foundTrivia = trivia.where((element) => element.$1 == index).firstOrNull;
+                final Trivia? foundTrivia = trivia.where((v) => v.$1 == index).firstOrNull;
                 return switch (foundTrivia) {
                   null => const SizedBox(height: 0),
-                  _ => Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 40.0, horizontal: 16.0),
-                      child: ListTile(
-                        leading: Text("${foundTrivia.$1}", style: const TextStyle(fontSize: 14.0)),
-                        title: Text(foundTrivia.$2),
-                      ),
-                    )
+                  _ => TriviaListItem(trivia: foundTrivia),
                 };
               },
               itemScrollController: itemScrollController,
               itemPositionsListener: itemPositionsListener,
               scrollOffsetController: scrollOffsetController,
               scrollOffsetListener: scrollOffsetListener,
-              physics: const RangeMaintainingScrollPhysics(),
+              physics: const RangeMaintainingScrollPhysics(), // NeverScrollableScrollPhysicsにするとユーザーのスクロールを無効にできる
             ),
           ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {},
-        tooltip: 'Action',
-        child: const Icon(Icons.adjust),
       ),
     );
   }
