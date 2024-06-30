@@ -6,6 +6,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:infinite_scroll_flutter_sample/feature/number/trivia.dart';
 import 'package:infinite_scroll_flutter_sample/feature/number/trivia_notifier.dart';
 import 'package:infinite_scroll_flutter_sample/widget/scroll_control_header.dart';
+import 'package:infinite_scroll_flutter_sample/widget/scrollable_list.dart';
 import 'package:infinite_scroll_flutter_sample/widget/trivia_list_item.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
@@ -24,10 +25,6 @@ class MyHomePage extends HookConsumerWidget {
     final scrollOffsetController = useMemoized(() => ScrollOffsetController());
     final scrollOffsetListener = useMemoized(() => ScrollOffsetListener.create());
 
-    scrollOffsetListener.changes.listen((offset) {
-      print(offset);
-    });
-
     final initialized = useState(false);
     final topIndex = useState(0);
     final bottomIndex = useState(0);
@@ -43,12 +40,10 @@ class MyHomePage extends HookConsumerWidget {
           topIndex.value = min(positions.first.index, positions.last.index);
           bottomIndex.value = max(positions.first.index, positions.last.index);
 
-          print("topIndex: ${topIndex.value}, bottomIndex: ${bottomIndex.value}");
-
-          final bottom = positions.last.index > positions.first.index ? positions.last : positions.first;
-          final leading = max(bottom.itemLeadingEdge, 0.0);
-          final trailing = min(bottom.itemTrailingEdge, 1.0);
-          final percent = ((trailing - leading) * 100).toInt();
+          // final bottom = positions.last.index > positions.first.index ? positions.last : positions.first;
+          // final leading = max(bottom.itemLeadingEdge, 0.0);
+          // final trailing = min(bottom.itemTrailingEdge, 1.0);
+          // final percent = ((trailing - leading) * 100).toInt();
           // print("bottom itemは画面表示領域の$percent%を占有しています。");
 
           final shouldSmallerFetch = topIndex.value <= 3 && initialized.value;
@@ -105,7 +100,7 @@ class MyHomePage extends HookConsumerWidget {
           ),
           if (trivia.isNotEmpty)
             Expanded(
-              child: ScrollablePositionedList.builder(
+              child: ScrollableList(
                 itemCount: trivia.length,
                 itemBuilder: (context, index) {
                   final Trivia foundTrivia = trivia[index];
@@ -119,9 +114,25 @@ class MyHomePage extends HookConsumerWidget {
                 scrollOffsetController: scrollOffsetController,
                 scrollOffsetListener: scrollOffsetListener,
                 initialScrollIndex: 10,
-                semanticChildCount: 100,
                 physics: const RangeMaintainingScrollPhysics(), // NeverScrollableScrollPhysicsにするとユーザーのスクロールを無効にできる
               ),
+              // child: ScrollablePositionedList.builder(
+              //   itemCount: trivia.length,
+              //   itemBuilder: (context, index) {
+              //     final Trivia foundTrivia = trivia[index];
+              //     return switch (foundTrivia) {
+              //       null => const SizedBox(height: 0),
+              //       _ => TriviaListItem(trivia: foundTrivia),
+              //     };
+              //   },
+              //   itemScrollController: itemScrollController,
+              //   itemPositionsListener: itemPositionsListener,
+              //   scrollOffsetController: scrollOffsetController,
+              //   scrollOffsetListener: scrollOffsetListener,
+              //   initialScrollIndex: 10,
+              //   semanticChildCount: 100,
+              //   physics: const RangeMaintainingScrollPhysics(), // NeverScrollableScrollPhysicsにするとユーザーのスクロールを無効にできる
+              // ),
             ),
         ],
       ),
