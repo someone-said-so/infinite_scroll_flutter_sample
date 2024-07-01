@@ -25,80 +25,55 @@ class MyHomePage extends HookConsumerWidget {
     final loading = ref.watch(triviaLoadingProvider);
 
     final itemScrollController = useMemoized(() => ItemScrollController());
-    final itemPositionsListener = useMemoized(() => ItemPositionsListener.create());
     final scrollOffsetController = useMemoized(() => ScrollOffsetController());
-    final scrollOffsetListener = useMemoized(() => ScrollOffsetListener.create());
-    final listener = useMemoized(() => ScrollableListEventListener.create());
+    final scrollableListener = useMemoized(() => ScrollableListEventListener.create());
 
     final initialized = useState(false);
     final topIndex = useState(0);
     final bottomIndex = useState(0);
 
-    // スクロール位置の保存
-    final scrollIndex = useState(initialScrollIndex);
-    final leadingEdge = useState(initialLeadingEdge);
-    final scrollHistory = useState(<(double, DateTime)>[]);
-
-    ref.listen(triviaProvider, (prev, next) {
-      final scrollOffsetInSecond = scrollHistory.value
-          .where((record) => DateTime.now().difference(record.$2).inSeconds <= 1)
-          .fold(0.0, (acc, current) => acc + current.$1);
-
-      if (next.length > (prev?.length ?? 0) && initialized.value && scrollOffsetInSecond < 0.0) {
-        itemScrollController.jumpTo(index: scrollIndex.value + 10, alignment: leadingEdge.value);
-        scrollOffsetController.animateScroll(
-          offset: -500.0,
-          duration: const Duration(milliseconds: 1000),
-          curve: Curves.easeOut,
-        );
+    useEffect(() {
+      onScrollOffsetEvent() {
+        (switch (scrollableListener.event.value) {
+          ScrollableListEventScrollOffset(:final offset) => () {
+              print("offset: $offset");
+            },
+          _ => () {},
+        })();
       }
-    });
+
+      scrollableListener.event.addListener(onScrollOffsetEvent);
+      return () => scrollableListener.event.removeListener(onScrollOffsetEvent);
+    }, []);
 
     useEffect(() {
-      listener() {
-        final positions = itemPositionsListener.itemPositions.value;
-        if (positions.isNotEmpty && trivia.isNotEmpty) {
-          topIndex.value = min(positions.first.index, positions.last.index);
-          bottomIndex.value = max(positions.first.index, positions.last.index);
+      onItemPositionEvent() {
+        (switch (scrollableListener.event.value) {
+          ScrollableListEventItemPositions(:final positions) => () {
+              if (positions.isNotEmpty && trivia.isNotEmpty) {
+                topIndex.value = min(positions.first.index, positions.last.index);
+                bottomIndex.value = max(positions.first.index, positions.last.index);
 
-          final top = positions.first.index <= positions.last.index ? positions.first : positions.last;
-          scrollIndex.value = top.index;
-          leadingEdge.value = top.itemLeadingEdge;
-          print("scrollIndex: ${scrollIndex.value}, leadingEdge: ${leadingEdge.value}");
+                // final bottom = positions.last.index > positions.first.index ? positions.last : positions.first;
+                // final leading = max(bottom.itemLeadingEdge, 0.0);
+                // final trailing = min(bottom.itemTrailingEdge, 1.0);
+                // final percent = ((trailing - leading) * 100).toInt();
+                // print("bottom itemは画面表示領域の$percent%を占有しています。");
 
-          // final bottom = positions.last.index > positions.first.index ? positions.last : positions.first;
-          // final leading = max(bottom.itemLeadingEdge, 0.0);
-          // final trailing = min(bottom.itemTrailingEdge, 1.0);
-          // final percent = ((trailing - leading) * 100).toInt();
-          // print("bottom itemは画面表示領域の$percent%を占有しています。");
+                final shouldSmallerFetch = topIndex.value <= 3 && initialized.value;
+                if (shouldSmallerFetch) triviaNotifier.fetchSmaller(10);
 
-          final shouldSmallerFetch = topIndex.value <= 3 && initialized.value;
-          if (shouldSmallerFetch) triviaNotifier.fetchSmaller(10);
-
-          final shouldBiggerFetch = (trivia.length - bottomIndex.value) <= 3 && initialized.value;
-          if (shouldBiggerFetch) triviaNotifier.fetchBigger(10);
-        }
+                final shouldBiggerFetch = (trivia.length - bottomIndex.value) <= 3 && initialized.value;
+                if (shouldBiggerFetch) triviaNotifier.fetchBigger(10);
+              }
+            },
+          _ => () {},
+        })();
       }
 
-      itemPositionsListener.itemPositions.addListener(listener);
-      return () => itemPositionsListener.itemPositions.removeListener(listener);
+      scrollableListener.event.addListener(onItemPositionEvent);
+      return () => scrollableListener.event.removeListener(onItemPositionEvent);
     }, [trivia, initialized]);
-
-    useEffect(() {
-      scrollOffsetListener.changes.listen((event) {
-        scrollHistory.value = [(event, DateTime.now()), ...scrollHistory.value].take(10).toList();
-      });
-      return null;
-    }, []);
-
-    useEffect(() {
-      fuga() {
-        print(listener.event.value);
-      }
-
-      listener.event.addListener(fuga);
-      return () => listener.event.removeListener(fuga);
-    }, []);
 
     useEffect(() {
       const startingNumber = 40;
@@ -106,12 +81,7 @@ class MyHomePage extends HookConsumerWidget {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         await triviaNotifier.fetchTrivias(List.generate(20, (index) => index + startingNumber));
         WidgetsBinding.instance.addPostFrameCallback((_) async {
-          // 10 + 1番目の要素つまりは#50にスクロール
-          // itemScrollController.scrollTo(
-          // itemScrollController.jumpTo(index: 10 + 1, alignment: 1.0);
-          WidgetsBinding.instance.addPostFrameCallback((_) async {
-            initialized.value = true;
-          });
+          initialized.value = true;
         });
       });
       return null;
@@ -151,10 +121,8 @@ class MyHomePage extends HookConsumerWidget {
                   };
                 },
                 itemScrollController: itemScrollController,
-                itemPositionsListener: itemPositionsListener,
                 scrollOffsetController: scrollOffsetController,
-                scrollOffsetListener: scrollOffsetListener,
-                listener: listener,
+                listener: scrollableListener,
                 initialScrollIndex: initialScrollIndex,
                 initialAlignment: initialLeadingEdge,
                 physics: const RangeMaintainingScrollPhysics(), // NeverScrollableScrollPhysicsにするとユーザーのスクロールを無効にできる
@@ -169,6 +137,9 @@ class MyHomePage extends HookConsumerWidget {
             duration: const Duration(seconds: 2),
             curve: Curves.easeOut,
           );
+          // 10 + 1番目の要素つまりは#50にスクロール
+          // itemScrollController.scrollTo(
+          // itemScrollController.jumpTo(index: 10 + 1, alignment: 1.0);
         },
         tooltip: 'Test',
         child: const Icon(Icons.add),
