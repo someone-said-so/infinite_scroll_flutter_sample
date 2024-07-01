@@ -1,3 +1,7 @@
+// ignore_for_file: library_private_types_in_public_api
+
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
@@ -23,6 +27,12 @@ class ScrollableList extends StatefulWidget {
   /// Index of an item to initially align within the viewport.
   final int initialScrollIndex;
 
+  /// Determines where the leading edge of the item at [initialScrollIndex]
+  /// should be placed.
+  ///
+  /// See [ItemScrollController.jumpTo] for an explanation of alignment.
+  final double initialAlignment;
+
   /// How the scroll view should respond to user input.
   ///
   /// For example, determines how the scroll view continues to animate after the
@@ -40,17 +50,26 @@ class ScrollableList extends StatefulWidget {
     this.scrollOffsetController,
     this.scrollOffsetListener,
     this.initialScrollIndex = 0,
+    this.initialAlignment = 0,
     this.physics,
   });
+
+  static StreamController<int> eventStreamController() => StreamController<int>();
 
   @override
   _ScrollableListState createState() => _ScrollableListState();
 }
 
 class _ScrollableListState extends State<ScrollableList> {
+  late ItemScrollController? _itemScrollController;
+  late ScrollOffsetController? _scrollOffsetController;
+  final controller = StreamController();
+
   @override
   void initState() {
     super.initState();
+    _itemScrollController = widget.itemScrollController ?? ItemScrollController();
+    _scrollOffsetController = widget.scrollOffsetController ?? ScrollOffsetController();
     print("ScrollableList is mounted.");
   }
 
@@ -63,7 +82,9 @@ class _ScrollableListState extends State<ScrollableList> {
   @override
   void didUpdateWidget(covariant ScrollableList oldWidget) {
     super.didUpdateWidget(oldWidget);
-    print("ScrollableList is updated.");
+    print("ScrollableList is updated. $oldWidget -> $widget");
+    _itemScrollController = widget.itemScrollController ?? ItemScrollController();
+    _scrollOffsetController = widget.scrollOffsetController ?? ScrollOffsetController();
   }
 
   @override
@@ -77,12 +98,16 @@ class _ScrollableListState extends State<ScrollableList> {
     return ScrollablePositionedList.builder(
       itemCount: widget.itemCount,
       itemBuilder: widget.itemBuilder,
-      itemScrollController: widget.itemScrollController,
+      itemScrollController: _itemScrollController,
       itemPositionsListener: widget.itemPositionsListener,
-      scrollOffsetController: widget.scrollOffsetController,
+      scrollOffsetController: _scrollOffsetController,
       scrollOffsetListener: widget.scrollOffsetListener,
       initialScrollIndex: widget.initialScrollIndex,
       physics: widget.physics,
     );
   }
+}
+
+sealed class ScrollableListEvent {
+  const ScrollableListEvent();
 }

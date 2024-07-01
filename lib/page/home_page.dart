@@ -6,6 +6,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:infinite_scroll_flutter_sample/feature/number/trivia.dart';
 import 'package:infinite_scroll_flutter_sample/feature/number/trivia_notifier.dart';
 import 'package:infinite_scroll_flutter_sample/widget/scroll_control_header.dart';
+import 'package:infinite_scroll_flutter_sample/widget/scrollable_list.dart';
 import 'package:infinite_scroll_flutter_sample/widget/trivia_list_item.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
@@ -46,7 +47,7 @@ class MyHomePage extends HookConsumerWidget {
         itemScrollController.jumpTo(index: scrollIndex.value + 10, alignment: leadingEdge.value);
         scrollOffsetController.animateScroll(
           offset: -500.0,
-          duration: Duration(milliseconds: 1000),
+          duration: const Duration(milliseconds: 1000),
           curve: Curves.easeOut,
         );
       }
@@ -130,7 +131,7 @@ class MyHomePage extends HookConsumerWidget {
           ),
           if (trivia.isNotEmpty)
             Expanded(
-              child: ScrollablePositionedList.builder(
+              child: ScrollableList(
                 itemCount: trivia.length,
                 itemBuilder: (context, index) {
                   final Trivia foundTrivia = trivia[index];
@@ -154,7 +155,7 @@ class MyHomePage extends HookConsumerWidget {
         onPressed: () {
           scrollOffsetController.animateScroll(
             offset: -200.0,
-            duration: Duration(seconds: 2),
+            duration: const Duration(seconds: 2),
             curve: Curves.easeOut,
           );
         },
