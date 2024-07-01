@@ -28,6 +28,7 @@ class MyHomePage extends HookConsumerWidget {
     final itemPositionsListener = useMemoized(() => ItemPositionsListener.create());
     final scrollOffsetController = useMemoized(() => ScrollOffsetController());
     final scrollOffsetListener = useMemoized(() => ScrollOffsetListener.create());
+    final listener = useMemoized(() => ScrollableListEventListener.create());
 
     final initialized = useState(false);
     final topIndex = useState(0);
@@ -91,6 +92,15 @@ class MyHomePage extends HookConsumerWidget {
     }, []);
 
     useEffect(() {
+      fuga() {
+        print(listener.event.value);
+      }
+
+      listener.event.addListener(fuga);
+      return () => listener.event.removeListener(fuga);
+    }, []);
+
+    useEffect(() {
       const startingNumber = 40;
       // 40..59の配列を読み込む
       WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -144,6 +154,7 @@ class MyHomePage extends HookConsumerWidget {
                 itemPositionsListener: itemPositionsListener,
                 scrollOffsetController: scrollOffsetController,
                 scrollOffsetListener: scrollOffsetListener,
+                listener: listener,
                 initialScrollIndex: initialScrollIndex,
                 initialAlignment: initialLeadingEdge,
                 physics: const RangeMaintainingScrollPhysics(), // NeverScrollableScrollPhysicsにするとユーザーのスクロールを無効にできる

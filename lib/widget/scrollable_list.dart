@@ -2,6 +2,7 @@
 
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
@@ -23,6 +24,8 @@ class ScrollableList extends StatefulWidget {
 
   /// Notifier that reports the changes to the scroll offset.
   final ScrollOffsetListener? scrollOffsetListener;
+
+  final ScrollableListEventNotifier? notifier;
 
   /// Index of an item to initially align within the viewport.
   final int initialScrollIndex;
@@ -49,10 +52,11 @@ class ScrollableList extends StatefulWidget {
     this.itemPositionsListener,
     this.scrollOffsetController,
     this.scrollOffsetListener,
+    ScrollableListEventListener? listener,
     this.initialScrollIndex = 0,
     this.initialAlignment = 0,
     this.physics,
-  });
+  }) : notifier = listener as ScrollableListEventNotifier?;
 
   static StreamController<int> eventStreamController() => StreamController<int>();
 
@@ -70,6 +74,7 @@ class _ScrollableListState extends State<ScrollableList> {
     super.initState();
     _itemScrollController = widget.itemScrollController ?? ItemScrollController();
     _scrollOffsetController = widget.scrollOffsetController ?? ScrollOffsetController();
+    widget.notifier?.event.addListener(_update);
     print("ScrollableList is mounted.");
   }
 
@@ -85,13 +90,18 @@ class _ScrollableListState extends State<ScrollableList> {
     print("ScrollableList is updated. $oldWidget -> $widget");
     _itemScrollController = widget.itemScrollController ?? ItemScrollController();
     _scrollOffsetController = widget.scrollOffsetController ?? ScrollOffsetController();
+
+    widget.notifier?.event.value = ScrollableListEventNothing();
   }
 
   @override
   void dispose() {
     print("ScrollableList is unmounted.");
+    widget.notifier?.event.removeListener(_update);
     super.dispose();
   }
+
+  void _update() {}
 
   @override
   Widget build(BuildContext context) {
@@ -110,4 +120,19 @@ class _ScrollableListState extends State<ScrollableList> {
 
 sealed class ScrollableListEvent {
   const ScrollableListEvent();
+}
+
+class ScrollableListEventNothing extends ScrollableListEvent {
+  const ScrollableListEventNothing();
+}
+
+abstract class ScrollableListEventListener {
+  factory ScrollableListEventListener.create() => ScrollableListEventNotifier();
+  ValueListenable<ScrollableListEvent> get event;
+}
+
+/// Internal implementation of [ItemPositionsListener].
+class ScrollableListEventNotifier implements ScrollableListEventListener {
+  @override
+  final ValueNotifier<ScrollableListEvent> event = ValueNotifier(const ScrollableListEventNothing());
 }
