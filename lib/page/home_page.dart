@@ -6,7 +6,6 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:infinite_scroll_flutter_sample/feature/number/trivia.dart';
 import 'package:infinite_scroll_flutter_sample/feature/number/trivia_notifier.dart';
 import 'package:infinite_scroll_flutter_sample/widget/scroll_control_header.dart';
-import 'package:infinite_scroll_flutter_sample/widget/scrollable_list.dart';
 import 'package:infinite_scroll_flutter_sample/widget/trivia_list_item.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
@@ -16,6 +15,10 @@ class MyHomePage extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // スクロールインデックスの初期位置
+    const initialScrollIndex = 10;
+    const initialLeadingEdge = 0.0;
+
     final trivia = ref.watch(triviaProvider);
     final triviaNotifier = ref.read(triviaProvider.notifier);
     final loading = ref.watch(triviaLoadingProvider);
@@ -29,8 +32,24 @@ class MyHomePage extends HookConsumerWidget {
     final topIndex = useState(0);
     final bottomIndex = useState(0);
 
+    // スクロール位置の保存
+    final scrollIndex = useState(initialScrollIndex);
+    final leadingEdge = useState(initialLeadingEdge);
+    final scrollHistory = useState(<(double, DateTime)>[]);
+
     ref.listen(triviaProvider, (prev, next) {
-      print("prev: ${prev?.length}, next: ${next.length}");
+      final scrollOffsetInSecond = scrollHistory.value
+          .where((record) => DateTime.now().difference(record.$2).inSeconds <= 1)
+          .fold(0.0, (acc, current) => acc + current.$1);
+
+      if (next.length > (prev?.length ?? 0) && initialized.value && scrollOffsetInSecond < 0.0) {
+        itemScrollController.jumpTo(index: scrollIndex.value + 10, alignment: leadingEdge.value);
+        scrollOffsetController.animateScroll(
+          offset: -500.0,
+          duration: Duration(milliseconds: 1000),
+          curve: Curves.easeOut,
+        );
+      }
     });
 
     useEffect(() {
@@ -39,6 +58,11 @@ class MyHomePage extends HookConsumerWidget {
         if (positions.isNotEmpty && trivia.isNotEmpty) {
           topIndex.value = min(positions.first.index, positions.last.index);
           bottomIndex.value = max(positions.first.index, positions.last.index);
+
+          final top = positions.first.index <= positions.last.index ? positions.first : positions.last;
+          scrollIndex.value = top.index;
+          leadingEdge.value = top.itemLeadingEdge;
+          print("scrollIndex: ${scrollIndex.value}, leadingEdge: ${leadingEdge.value}");
 
           // final bottom = positions.last.index > positions.first.index ? positions.last : positions.first;
           // final leading = max(bottom.itemLeadingEdge, 0.0);
@@ -49,14 +73,21 @@ class MyHomePage extends HookConsumerWidget {
           final shouldSmallerFetch = topIndex.value <= 3 && initialized.value;
           if (shouldSmallerFetch) triviaNotifier.fetchSmaller(10);
 
-          // final shouldBiggerFetch = (trivia.last.$1 - bottomIndex.value) <= 3 && initialized.value;
-          // if (shouldBiggerFetch) triviaNotifier.fetchBigger(10);
+          final shouldBiggerFetch = (trivia.length - bottomIndex.value) <= 3 && initialized.value;
+          if (shouldBiggerFetch) triviaNotifier.fetchBigger(10);
         }
       }
 
       itemPositionsListener.itemPositions.addListener(listener);
       return () => itemPositionsListener.itemPositions.removeListener(listener);
     }, [trivia, initialized]);
+
+    useEffect(() {
+      scrollOffsetListener.changes.listen((event) {
+        scrollHistory.value = [(event, DateTime.now()), ...scrollHistory.value].take(10).toList();
+      });
+      return null;
+    }, []);
 
     useEffect(() {
       const startingNumber = 40;
@@ -66,7 +97,6 @@ class MyHomePage extends HookConsumerWidget {
         WidgetsBinding.instance.addPostFrameCallback((_) async {
           // 10 + 1番目の要素つまりは#50にスクロール
           // itemScrollController.scrollTo(
-          //     index: 10, alignment: 1.0, duration: const Duration(seconds: 1), curve: Curves.easeInOutCubic);
           // itemScrollController.jumpTo(index: 10 + 1, alignment: 1.0);
           WidgetsBinding.instance.addPostFrameCallback((_) async {
             initialized.value = true;
@@ -100,7 +130,7 @@ class MyHomePage extends HookConsumerWidget {
           ),
           if (trivia.isNotEmpty)
             Expanded(
-              child: ScrollableList(
+              child: ScrollablePositionedList.builder(
                 itemCount: trivia.length,
                 itemBuilder: (context, index) {
                   final Trivia foundTrivia = trivia[index];
@@ -113,28 +143,23 @@ class MyHomePage extends HookConsumerWidget {
                 itemPositionsListener: itemPositionsListener,
                 scrollOffsetController: scrollOffsetController,
                 scrollOffsetListener: scrollOffsetListener,
-                initialScrollIndex: 10,
+                initialScrollIndex: initialScrollIndex,
+                initialAlignment: initialLeadingEdge,
                 physics: const RangeMaintainingScrollPhysics(), // NeverScrollableScrollPhysicsにするとユーザーのスクロールを無効にできる
               ),
-              // child: ScrollablePositionedList.builder(
-              //   itemCount: trivia.length,
-              //   itemBuilder: (context, index) {
-              //     final Trivia foundTrivia = trivia[index];
-              //     return switch (foundTrivia) {
-              //       null => const SizedBox(height: 0),
-              //       _ => TriviaListItem(trivia: foundTrivia),
-              //     };
-              //   },
-              //   itemScrollController: itemScrollController,
-              //   itemPositionsListener: itemPositionsListener,
-              //   scrollOffsetController: scrollOffsetController,
-              //   scrollOffsetListener: scrollOffsetListener,
-              //   initialScrollIndex: 10,
-              //   semanticChildCount: 100,
-              //   physics: const RangeMaintainingScrollPhysics(), // NeverScrollableScrollPhysicsにするとユーザーのスクロールを無効にできる
-              // ),
             ),
         ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          scrollOffsetController.animateScroll(
+            offset: -200.0,
+            duration: Duration(seconds: 2),
+            curve: Curves.easeOut,
+          );
+        },
+        tooltip: 'Test',
+        child: const Icon(Icons.add),
       ),
     );
   }
